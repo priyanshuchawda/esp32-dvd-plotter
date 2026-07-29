@@ -1,0 +1,57 @@
+# FluidNC configuration for an original ESP32 DevKit and two HW-130
+# A4988-compatible drivers. This is an initial, low-speed commissioning config.
+# Do not enable X/Y soft limits until the travel has been measured and homing
+# switches have been installed or a repeatable manual-zero procedure is adopted.
+
+name: "ESP32 DVD Pen Plotter"
+board: "ESP32 DevKit"
+
+stepping:
+  engine: RMT
+  idle_ms: 255
+  pulse_us: 3
+  dir_delay_us: 2
+  disable_delay_us: 0
+
+axes:
+  # A4988 EN is active-low. Wire both driver EN pins to GPIO33.
+  shared_stepper_disable_pin: gpio.33:low
+
+  x:
+    # Starting estimate for a common DVD mechanism at 1/8 microstepping.
+    # Calibrate from measured travel before drawing.
+    steps_per_mm: 53.333
+    max_rate_mm_per_min: 400.000
+    acceleration_mm_per_sec2: 20.000
+    max_travel_mm: 35.000
+    soft_limits: false
+    motor0:
+      stepstick:
+        step_pin: gpio.25
+        direction_pin: gpio.26
+
+  y:
+    steps_per_mm: 53.333
+    max_rate_mm_per_min: 400.000
+    acceleration_mm_per_sec2: 20.000
+    max_travel_mm: 35.000
+    soft_limits: false
+    motor0:
+      stepstick:
+        step_pin: gpio.27
+        direction_pin: gpio.14
+
+  z:
+    # A virtual 5 mm axis: Z0 and Z5 map to the two servo pulse endpoints.
+    # Use test commands to find safe endpoints, then enable soft_limits.
+    steps_per_mm: 100.000
+    max_rate_mm_per_min: 300.000
+    acceleration_mm_per_sec2: 20.000
+    max_travel_mm: 5.000
+    soft_limits: false
+    motor0:
+      rc_servo:
+        output_pin: gpio.32
+        pwm_hz: 50
+        min_pulse_us: 1000
+        max_pulse_us: 2000
