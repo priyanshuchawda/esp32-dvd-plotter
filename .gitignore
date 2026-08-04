@@ -8,3 +8,4 @@ sim/out/
 build/
 __pycache__/
 *.pyc
+cad/out/

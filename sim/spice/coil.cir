@@ -1,0 +1,18 @@
+* DVD stepper coil driven through an L293D bipolar H-bridge
+* Vsat models the L293D total source+sink saturation drop (~1.8 V at 5 V)
+.param Rcoil=10 Lcoil=5m Vsup=5 Vsat=1.8
+
+Vsup  vs 0 DC {Vsup}
+Vdrop vs vd DC {Vsat}
+Rc    vd vm {Rcoil}
+Lc    vm 0  {Lcoil}
+
+.tran 10u 5m
+.control
+run
+let i_coil = i(Lc)
+meas tran isteady FIND i_coil AT=4.5m
+meas tran itau    FIND i_coil AT=500u
+print isteady itau
+.endc
+.end
