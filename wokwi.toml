@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+firmware = 'build/esp32-dvd-plotter.ino.merged.bin'
+elf = 'build/esp32-dvd-plotter.ino.elf'

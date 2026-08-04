@@ -44,17 +44,21 @@ Viewed from above with the notch at the top:
 
 The custom board connects only these socket contacts:
 
-| Socket contact | Shield direction line | ESP32 pin |
-| --- | --- | --- |
-| 1 | M2 coil A | GPIO18 |
-| 2 | M1 coil A | GPIO16 |
-| 3 | M1 coil B | GPIO17 |
-| 4 | M2 coil B | GPIO19 |
-| 5 | M3 coil A | GPIO21 |
-| 6 | M4 coil B | GPIO13 |
-| 7 | M3 coil B | GPIO22 |
-| 8 | common ground | ESP32 GND |
-| 15 | M4 coil A | GPIO23 |
+| Socket contact | Shield direction line | ESP32 pin | Silkscreen on a 30-pin DevKit |
+| --- | --- | --- | --- |
+| 1 | M2 coil A | GPIO18 | `D18` |
+| 2 | M1 coil A | GPIO16 | `RX2` |
+| 3 | M1 coil B | GPIO17 | `TX2` |
+| 4 | M2 coil B | GPIO19 | `D19` |
+| 5 | M3 coil A | GPIO21 | `D21` |
+| 6 | M4 coil B | GPIO13 | `D13` |
+| 7 | M3 coil B | GPIO22 | `D22` |
+| 8 | common ground | ESP32 GND | `GND` |
+| 15 | M4 coil A | GPIO23 | `D23` |
+
+Most 30-pin DevKit boards do not print "16" or "17" anywhere. Those two GPIOs
+are the pins labelled `RX2` and `TX2`. They are ordinary GPIOs here and are not
+used for serial, so using them is safe.
 
 All other socket contacts, especially **pin 16**, remain electrically open on
 the custom PCB. Pin 16 is the shield's 5 V rail; connecting it to an ESP32

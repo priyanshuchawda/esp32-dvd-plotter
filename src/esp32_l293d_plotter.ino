@@ -96,6 +96,7 @@ bool absoluteMode = true;
 bool motorsEnabled = false;
 uint16_t penUpUs = 1000;
 uint16_t penDownUs = 1600;
+uint16_t penSettleMs = 250;
 bool penIsDown = false;
 
 String usbLine;
@@ -129,8 +130,11 @@ uint32_t pulseToDuty(uint16_t pulseUs) {
 }
 
 void setPen(bool down) {
+  const bool changed = down != penIsDown;
   penIsDown = down;
   ledcWrite(SERVO_PIN, pulseToDuty(down ? penDownUs : penUpUs));
+  // The SG90 needs time to travel; moving during it would drag the pen tip.
+  if (changed) delay(penSettleMs);
 }
 
 void showStatus() {
@@ -218,7 +222,8 @@ bool setSetting(const String &line, const char *prefix, float &setting) {
 
 void handleSystemCommand(const String &line) {
   if (line == "$HELP") {
-    replyLine("$STATUS, $STEPSX=value, $STEPSY=value, $PENUP=us, $PENDOWN=us, $MOTORS=ON|OFF");
+    replyLine("$STATUS, $STEPSX=value, $STEPSY=value, $PENUP=us, $PENDOWN=us, "
+              "$PENSETTLE=ms, $MOTORS=ON|OFF");
     return;
   }
   if (line == "$STATUS" || line == "?") {
@@ -236,6 +241,17 @@ void handleSystemCommand(const String &line) {
     }
     if (isUp) penUpUs = pulse; else penDownUs = pulse;
     setPen(penIsDown);
+    replyLine("ok");
+    return;
+  }
+
+  if (line.startsWith("$PENSETTLE=")) {
+    const long settle = line.substring(11).toInt();
+    if (settle < 0 || settle > 2000) {
+      replyLine("error: pen settle must be 0..2000ms");
+      return;
+    }
+    penSettleMs = static_cast<uint16_t>(settle);
     replyLine("ok");
     return;
   }

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "author": "esp32-dvd-plotter",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    {
+      "type": "wokwi-logic-analyzer",
+      "id": "logic1",
+      "top": -140,
+      "left": 200,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    ["esp:RX2", "logic1:D0", "green", []],
+    ["esp:TX2", "logic1:D1", "green", []],
+    ["esp:D18", "logic1:D2", "green", []],
+    ["esp:D19", "logic1:D3", "green", []],
+    ["esp:D21", "logic1:D4", "blue", []],
+    ["esp:D22", "logic1:D5", "blue", []],
+    ["esp:D23", "logic1:D6", "blue", []],
+    ["esp:D13", "logic1:D7", "blue", []],
+    ["esp:GND.1", "logic1:GND", "black", []]
+  ]
+}

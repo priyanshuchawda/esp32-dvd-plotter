@@ -4,3 +4,5 @@ build/
 *.bin
 *.map
 .DS_Store
+sim/out/
+build/
