@@ -6,3 +6,5 @@ build/
 .DS_Store
 sim/out/
 build/
+__pycache__/
+*.pyc
