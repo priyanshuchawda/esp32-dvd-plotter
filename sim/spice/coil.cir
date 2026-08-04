@@ -1,18 +1,46 @@
-* DVD stepper coil driven through an L293D bipolar H-bridge
-* Vsat models the L293D total source+sink saturation drop (~1.8 V at 5 V)
+* DVD stepper coil driven through an L293D bipolar H-bridge.
+*
+* Answers: how fast can we step before the coil current, and therefore the
+* torque, collapses? The coil is an L/R circuit, so current needs roughly
+* 3 * L/R to reach full value after the bridge switches.
+*
+* Vsat models the L293D total source+sink saturation drop, about 1.8 V at 5 V,
+* which is the main reason this shield is weak compared to a chopper driver.
+*
+* The drive MUST be a pulse, not a DC source. With DC, ngspice solves the
+* operating point first and the inductor starts already energised, hiding the
+* rise time completely.
+*
+* Measure your coil with a multimeter and set Rcoil; Lcoil is a typical value.
+
 .param Rcoil=10 Lcoil=5m Vsup=5 Vsat=1.8
+.param Veff={Vsup-Vsat}
+.param fstep=200
 
-Vsup  vs 0 DC {Vsup}
-Vdrop vs vd DC {Vsat}
-Rc    vd vm {Rcoil}
-Lc    vm 0  {Lcoil}
+* Full-step, two-phase-on: each coil is energised for 2 of the 4 states, so
+* the on-time is two step periods and the electrical cycle is four.
+.param Tstep={1/fstep}
+.param Ton={2*Tstep}
+.param Tper={4*Tstep}
 
-.tran 10u 5m
+Vdrv d 0 PULSE(0 {Veff} 0 1u 1u {Ton} {Tper})
+Rc   d vm {Rcoil}
+Lc   vm 0 {Lcoil} ic=0
+
+.tran {Tper/400} {3*Tper} uic
+
+* .param values are netlist-only; .csparam also exports them to the control
+* shell, which is where the measurements below run.
+.csparam ifull={Veff/Rcoil}
+.csparam tmeas0={2*Tper}
+.csparam tmeas1={2*Tper+Ton}
+
 .control
 run
 let i_coil = i(Lc)
-meas tran isteady FIND i_coil AT=4.5m
-meas tran itau    FIND i_coil AT=500u
-print isteady itau
+* Peak reached during an on-time, after the waveform has settled.
+meas tran ipeak MAX i_coil FROM=$&tmeas0 TO=$&tmeas1
+let frac = ipeak/ifull
+print ifull ipeak frac
 .endc
 .end
