@@ -40,14 +40,23 @@ QA..QH, which are chip pins 15, 1, 2, 3, 4, 5, 6, 7.
 
 ### If the chip is soldered down (most clones, including the photographed one)
 
-Do not try to desolder it. The output-enable pin is active-low and the shield
-holds it high through a pull-up, so with no Arduino plugged in **the outputs
-are already high-impedance**. The chip is physically present but has
-electrically let go of those eight lines, leaving them free to drive.
+Do not try to desolder it. Disable it instead.
 
-To make that certain rather than relying on a clone's pull-up, run a wire from
-the `D7` header pad to the shield's `5V` pad. `D7` is the output-enable line.
-Holding it high guarantees the chip stays disconnected.
+**Wire the `D7` pad to the shield's `5V` pad before anything else.** `D7` is
+the shift register's output-enable, which is active-low, so holding it high
+forces all eight outputs to high-impedance. The chip stays physically in place
+but electrically lets go of those lines, leaving them free for the ESP32.
+
+This wire is mandatory, not a precaution. Sources disagree on which way the
+pin idles: Adafruit's own documentation describes a pull-up that disables the
+outputs, while at least one clone's parts list has a 10K pulldown that would
+*enable* them. Tying the pad to 5 V overrides either, since a hard connection
+beats a 10K resistor. Skip it and you risk the 74HC595 driving the same wires
+as your ESP32 GPIOs, two push-pull outputs fighting, which can damage both.
+
+Verify before going further: with logic power applied and nothing else
+connected, measure 74HC595 pin 13 against ground. It must read close to 5 V.
+If it reads near 0 V the outputs are still live; find and fix that first.
 
 Then solder your ESP32 wires **onto the 74HC595's own output legs**. Those legs
 are the same electrical nodes as the L293D inputs, so the pin numbers in the
