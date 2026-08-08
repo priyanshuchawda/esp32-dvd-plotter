@@ -30,6 +30,7 @@ it uses custom coil-sequencing firmware instead of FluidNC.
 | --- | --- |
 | [`tools/text2gcode.py`](tools/text2gcode.py) | Writing text with single-stroke Hershey fonts |
 | [`tools/image2gcode.py`](tools/image2gcode.py) | Tracing a bitmap into outlines |
+| [`tools/handwriting2gcode.py`](tools/handwriting2gcode.py) | Generating handwriting with a neural model |
 | [`tools/send_gcode.py`](tools/send_gcode.py) | Streaming a job over USB serial |
 
 Use `text2gcode.py` for text rather than tracing a rendered font. Tracing
@@ -47,6 +48,29 @@ python3 sim/simulate.py note.gcode --envelope 35 --out preview.png
 `futuram`, and `gothiceng` are also included. Default characters are 4 mm tall,
 which fits roughly 7 per line. Dropping to 3 mm fits about 11 characters across
 4 lines, which is close to the practical limit of a 35 mm bed.
+
+## Neural handwriting
+
+Hershey `cursive` is joined but mechanical — every `o` is identical. For output
+with real variation, a Graves-style LSTM predicts pen trajectories directly, so
+there is no image or vectorisation step between the model and the G-code.
+
+```bash
+./tools/setup_handwriting.sh          # clones the model, builds ext/venv
+ext/venv/bin/python tools/handwriting2gcode.py "hello world" -o hw.gcode --seed 7
+python3 sim/simulate.py hw.gcode --envelope 35 --out preview.png
+```
+
+Sampling runs on the CPU in about ten seconds a line; no GPU is needed. `--bias`
+trades variation for legibility, and higher is usually right at this size.
+`--seed` fixes the style so a result can be reproduced. `--wrap` sets characters
+per line, which is what actually controls how large the writing ends up.
+
+The model is not perfectly accurate — it occasionally malforms a letter, so
+check the preview before plotting. Verifying output with a handwriting
+recogniser would catch this automatically and is the obvious next addition.
+
+Everything lands in `ext/`, which is gitignored; delete it to start over.
 
 ## Size limits
 

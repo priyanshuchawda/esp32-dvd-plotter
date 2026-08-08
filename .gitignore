@@ -9,3 +9,6 @@ build/
 __pycache__/
 *.pyc
 cad/out/
+
+# Neural handwriting toolkit and its environment (see tools/setup_handwriting.sh)
+ext/
