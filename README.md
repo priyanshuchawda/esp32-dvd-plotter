@@ -24,6 +24,37 @@ it uses custom coil-sequencing firmware instead of FluidNC.
 4. Run [`test-square.gcode`](test-square.gcode) with the pen lifted, then on
    paper.
 
+## Making G-code
+
+| Tool | Use it for |
+| --- | --- |
+| [`tools/text2gcode.py`](tools/text2gcode.py) | Writing text with single-stroke Hershey fonts |
+| [`tools/image2gcode.py`](tools/image2gcode.py) | Tracing a bitmap into outlines |
+| [`tools/send_gcode.py`](tools/send_gcode.py) | Streaming a job over USB serial |
+
+Use `text2gcode.py` for text rather than tracing a rendered font. Tracing
+follows the *outline* of each letter, so the pen draws each stroke as a hollow
+loop, which is unreadable at the size this machine works at. Hershey fonts
+store stroke centrelines, so the pen follows the same path a hand would.
+
+```bash
+tools/text2gcode.py "hello world" -o hello.gcode
+tools/text2gcode.py --font cursive --char-height 3 "your text" -o note.gcode
+python3 sim/simulate.py note.gcode --envelope 35 --out preview.png
+```
+
+`futural` is a plain sans face and `cursive` is joined handwriting; `timesr`,
+`futuram`, and `gothiceng` are also included. Default characters are 4 mm tall,
+which fits roughly 7 per line. Dropping to 3 mm fits about 11 characters across
+4 lines, which is close to the practical limit of a 35 mm bed.
+
+## Size limits
+
+DVD sleds give about 35 mm of travel per axis, so the whole page is smaller
+than a postage stamp — around 40 characters of 3 mm cursive. Nothing in
+software changes that. Writing longer passages needs either a paper-feed axis
+or a machine with longer rails.
+
 `config.yaml` and `upload-fluidnc-file.py` are retained only as history from
 the earlier A4988/FluidNC approach. They must not be used with this L293D
 shield.
