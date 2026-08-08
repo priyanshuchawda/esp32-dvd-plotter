@@ -98,6 +98,10 @@ uint16_t penUpUs = 1000;
 uint16_t penDownUs = 1600;
 uint16_t penSettleMs = 250;
 bool penIsDown = false;
+// SVG-to-G-code tools raise and lower the pen with M300 S<angle> rather than
+// Z moves. Unicorn emits S30 for down and S50 for up, so anything at or below
+// this threshold counts as pen down.
+float penDownThresholdS = 40.0f;
 
 String usbLine;
 String bluetoothLine;
@@ -223,14 +227,15 @@ bool setSetting(const String &line, const char *prefix, float &setting) {
 void handleSystemCommand(const String &line) {
   if (line == "$HELP") {
     replyLine("$STATUS, $STEPSX=value, $STEPSY=value, $PENUP=us, $PENDOWN=us, "
-              "$PENSETTLE=ms, $MOTORS=ON|OFF");
+              "$PENSETTLE=ms, $PENTHRESH=value, $MOTORS=ON|OFF");
     return;
   }
   if (line == "$STATUS" || line == "?") {
     showStatus();
     return;
   }
-  if (setSetting(line, "$STEPSX=", stepsPerMmX) || setSetting(line, "$STEPSY=", stepsPerMmY)) return;
+  if (setSetting(line, "$STEPSX=", stepsPerMmX) || setSetting(line, "$STEPSY=", stepsPerMmY) ||
+      setSetting(line, "$PENTHRESH=", penDownThresholdS)) return;
 
   if (line.startsWith("$PENUP=") || line.startsWith("$PENDOWN=")) {
     const bool isUp = line.startsWith("$PENUP=");
@@ -300,6 +305,30 @@ void executeGcode(String line) {
     replyLine("ok");
     return;
   }
+  // M300 (Unicorn) and M280 (generic servo) both carry the pen angle in S.
+  if (mCode == 300 || mCode == 280) {
+    float sValue = 0;
+    if (extractValue(line, 'S', sValue)) setPen(sValue <= penDownThresholdS);
+    replyLine("ok");
+    return;
+  }
+  if (mCode == 18 || mCode == 84) {
+    setMotorEnable(false);
+    replyLine("ok");
+    return;
+  }
+  // Pronterface polls temperature on a timer. Answering keeps it from
+  // reporting the printer as unresponsive part-way through a plot.
+  if (mCode == 105) {
+    replyLine("ok T:0.0 /0.0 B:0.0 /0.0");
+    return;
+  }
+  if (mCode == 114) {
+    replyLine("X:" + String(xPositionMm, 2) + " Y:" + String(yPositionMm, 2) +
+              " Z:0.00 E:0.00");
+    replyLine("ok");
+    return;
+  }
   if (gCode == 20) {
     unitScaleMm = 25.4f;
     replyLine("ok");
@@ -329,8 +358,20 @@ void executeGcode(String line) {
     replyLine("ok");
     return;
   }
+  // There are no endstops, so "home" can only mean returning to where the
+  // carriages sat at power-on. Centre them by hand before switching on.
+  if (gCode == 28) {
+    setPen(false);
+    moveLinear(0.0f, 0.0f, RAPID_FEED_MM_MIN);
+    replyLine("ok");
+    return;
+  }
   if (gCode != 0 && gCode != 1) {
-    replyLine("error: supported G-codes are G0, G1, G20, G21, G90, G91, G92");
+    // A host expects exactly one ok per line and will stall forever if an
+    // unknown command is answered with an error alone, so acknowledge it and
+    // report what was skipped.
+    replyLine("echo:ignored " + line);
+    replyLine("ok");
     return;
   }
 

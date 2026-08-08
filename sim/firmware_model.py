@@ -76,6 +76,7 @@ class PlotterModel:
     motors_enabled: bool = False
     pen_down: bool = False
     pen_settle_ms: int = 250
+    pen_down_threshold_s: float = 40.0
 
     time_us: int = 0
     events: list[StepEvent] = field(default_factory=list)
@@ -179,6 +180,17 @@ class PlotterModel:
             self.set_pen(False)
             self.motors_enabled = False
             return
+        # M300 (Unicorn) and M280 carry the pen angle in S; low means down.
+        if m_code in (300, 280):
+            s_value = _extract_float(line, "S")
+            if s_value is not None:
+                self.set_pen(s_value <= self.pen_down_threshold_s)
+            return
+        if m_code in (18, 84):
+            self.motors_enabled = False
+            return
+        if m_code in (105, 114):
+            return
 
         if g_code == 20:
             self.unit_scale_mm = 25.4
@@ -201,6 +213,11 @@ class PlotterModel:
                 self.y_position_mm = y * self.unit_scale_mm
             self.x_motor.position_steps = to_steps(self.x_position_mm, self.steps_per_mm_x)
             self.y_motor.position_steps = to_steps(self.y_position_mm, self.steps_per_mm_y)
+            return
+
+        if g_code == 28:
+            self.set_pen(False)
+            self.move_linear(0.0, 0.0, RAPID_FEED_MM_MIN)
             return
 
         if g_code not in (0, 1):
