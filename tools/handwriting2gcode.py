@@ -14,6 +14,7 @@ variation. At the size a 35 mm bed forces, legibility usually wins.
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import os
 import sys
@@ -132,6 +133,9 @@ def main():
     parser.add_argument("--checkpoint", default="Epoch_56")
     parser.add_argument("--toolkit", type=Path, default=DEFAULT_TOOLKIT)
     parser.add_argument("--seed", type=int, help="fix the random style")
+    parser.add_argument("--skip-unsupported", action="store_true",
+                        help="drop characters the model cannot write instead of "
+                             "refusing to run")
     parser.add_argument("--steps-per-char", type=float, default=32.0,
                         help="sampling budget per character")
     parser.add_argument("--width", type=float, default=35.0)
@@ -164,14 +168,29 @@ def main():
     if args.seed is not None:
         torch.manual_seed(args.seed)
 
+    checkpoint = toolkit / "checkpoints" / args.checkpoint
+    if not checkpoint.is_dir():
+        sys.exit(f"no checkpoint at {checkpoint}")
+
+    # Characters outside the alphabet are tokenised to 0 rather than rejected,
+    # so the model quietly writes something arbitrary in their place.
+    charset = set(json.loads((checkpoint / "meta.json").read_text())["charset"])
+    unsupported = sorted(set(text) - charset - {"\n"})
+    if unsupported:
+        shown = " ".join(repr(c) for c in unsupported)
+        if args.skip_unsupported:
+            print(f"dropping characters the model cannot write: {shown}",
+                  file=sys.stderr)
+            text = "".join(c for c in text if c in charset or c == "\n")
+        else:
+            sys.exit(f"the model has no glyph for: {shown}\n"
+                     f"It would write something arbitrary instead, so nothing "
+                     f"was generated. Rephrase, or pass --skip-unsupported.")
+
     rows = [row for block in text.split("\n")
             for row in (textwrap.wrap(block, args.wrap) or [""]) if row]
     if not rows:
         sys.exit("nothing to write")
-
-    checkpoint = toolkit / "checkpoints" / args.checkpoint
-    if not checkpoint.is_dir():
-        sys.exit(f"no checkpoint at {checkpoint}")
     synthesizer = Synthesizer.load(str(checkpoint), torch.device("cpu"), args.bias)
 
     print(f"sampling {len(rows)} line(s) on CPU...", file=sys.stderr)
