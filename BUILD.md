@@ -72,6 +72,32 @@ lands you in the 250–450 mA band. This is why a blanket "use 9 V" is wrong: at
 After a few minutes of running, touch the motors. If they are too hot to hold
 comfortably, drop a volt. The coils stay energised during a plot.
 
+### If you have not measured the coils
+
+You do not have to. The firmware chops the L293D enable pins at 20 kHz, so the
+average coil current is set in software rather than purely by Ohm's law. That
+turns an irreversible hardware guess into an adjustable dial.
+
+`$POWER=` takes 5 to 100 percent and defaults to a deliberately timid 45,
+which is safe at any coil resistance you are realistically going to find.
+
+Wire up a 6 V or 7.5 V supply, then walk it up:
+
+```
+> $POWER=45
+> G1 X10 F200      # does it move cleanly?
+> $POWER=55        # if it stalls or skips, raise and retry
+```
+
+Stop as soon as movement is reliable. Every extra percent is heat you do not
+need. Give it a few minutes and feel the motors and the L293D chips; if either
+is too hot to keep a finger on, come back down.
+
+Measuring still gives a better result, because it lets you pick the right
+supply voltage instead of throwing away the excess as heat, and it makes the
+step-rate figures below real rather than estimated. But it is no longer a
+prerequisite for switching on.
+
 > **Remove the power jumper on the shield.** The HW-130 has a jumper tying the
 > motor supply to the logic 5 V rail. Leave it in with an external supply and
 > you push 9 V into the ESP32's 5 V pin and destroy the board. Take it off

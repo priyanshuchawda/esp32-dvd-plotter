@@ -53,6 +53,10 @@ constexpr uint8_t ENABLE_M4 = 32;
 constexpr uint8_t SERVO_PIN = 33;
 
 constexpr uint8_t FULL_SPEED_PWM = 255;
+// Chopping the enable pins limits average coil current, which is what lets
+// this run safely without knowing the coil resistance up front. Well above
+// the coil's L/R corner so the current stays smooth instead of pulsing.
+constexpr uint32_t ENABLE_PWM_HZ = 20000;
 constexpr float RAPID_FEED_MM_MIN = 300.0f;
 constexpr float DEFAULT_FEED_MM_MIN = 180.0f;
 constexpr uint32_t MIN_STEP_INTERVAL_US = 2000;
@@ -124,6 +128,9 @@ float yPositionMm = 0.0f;
 float unitScaleMm = 1.0f;
 bool absoluteMode = true;
 bool motorsEnabled = false;
+// Deliberately timid. Raise with $POWER= until the motors move reliably; this
+// is safe at any coil resistance, whereas full power is not.
+uint8_t motorPowerPercent = 45;
 uint16_t penUpUs = 1000;
 uint16_t penDownUs = 1600;
 uint16_t penSettleMs = 250;
@@ -149,7 +156,8 @@ void replyLine(const String &message) {
 
 void setMotorEnable(bool enabled) {
   motorsEnabled = enabled;
-  const uint8_t duty = enabled ? FULL_SPEED_PWM : 0;
+  const uint8_t duty =
+      enabled ? static_cast<uint8_t>((FULL_SPEED_PWM * motorPowerPercent) / 100) : 0;
   analogWrite(ENABLE_M1, duty);
   analogWrite(ENABLE_M2, duty);
   analogWrite(ENABLE_M3, duty);
@@ -286,8 +294,9 @@ bool setSetting(const String &line, const char *prefix, float &setting) {
 
 void handleSystemCommand(const String &line) {
   if (line == "$HELP") {
-    replyLine("$STATUS, $COILTEST, $STEPSX=value, $STEPSY=value, $PENUP=us, "
-              "$PENDOWN=us, $PENSETTLE=ms, $PENTHRESH=value, $MOTORS=ON|OFF");
+    replyLine("$STATUS, $COILTEST, $POWER=percent, $STEPSX=value, $STEPSY=value, "
+              "$PENUP=us, $PENDOWN=us, $PENSETTLE=ms, $PENTHRESH=value, "
+              "$MOTORS=ON|OFF");
     return;
   }
   if (line == "$STATUS" || line == "?") {
@@ -311,6 +320,18 @@ void handleSystemCommand(const String &line) {
     }
     if (isUp) penUpUs = pulse; else penDownUs = pulse;
     setPen(penIsDown);
+    replyLine("ok");
+    return;
+  }
+
+  if (line.startsWith("$POWER=")) {
+    const long percent = line.substring(7).toInt();
+    if (percent < 5 || percent > 100) {
+      replyLine("error: power must be 5..100 percent");
+      return;
+    }
+    motorPowerPercent = static_cast<uint8_t>(percent);
+    if (motorsEnabled) setMotorEnable(true);
     replyLine("ok");
     return;
   }
@@ -580,6 +601,9 @@ void setup() {
   pinMode(ENABLE_M2, OUTPUT);
   pinMode(ENABLE_M3, OUTPUT);
   pinMode(ENABLE_M4, OUTPUT);
+  for (uint8_t pin : {ENABLE_M1, ENABLE_M2, ENABLE_M3, ENABLE_M4}) {
+    analogWriteFrequency(pin, ENABLE_PWM_HZ);
+  }
   xMotor.begin();
   yMotor.begin();
   setMotorEnable(false);
