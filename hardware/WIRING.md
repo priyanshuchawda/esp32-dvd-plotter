@@ -1,8 +1,13 @@
 # HW-130 socket-plug PCB and wiring
 
 This wiring bypasses the shield's 74HC595 direction shift register. It is for
-the photographed HW-130 shield with two L293D chips and one socketed 74HC595.
-It must not be used with an A4988 driver board.
+the photographed HW-130 shield carrying two L293D drivers and one 74HC595,
+whether that chip is socketed or soldered down. It must not be used with an
+A4988 driver board.
+
+Identify the 74HC595 by reading the markings: the two chips marked `L293D` are
+the motor drivers, and the remaining one is the shift register. Do not go by
+position, since board revisions differ.
 
 ## 1. Safe power arrangement
 
@@ -22,11 +27,40 @@ The shield needs its separate `5V` logic connection because it is no longer
 mounted on an Arduino. `EXT_PWR` alone powers the motor side; it does not
 reliably provide the logic supply in this standalone setup.
 
-## 2. 74HC595 socket plug
+## 2. Getting the 74HC595 out of the signal path
 
-Remove the upper 74HC595 with all power disconnected. Its small semicircular
-notch points toward the top motor terminals. Put the custom PCB's male
-16-pin plug into that empty socket with the same notch orientation.
+The eight direction lines reach the L293D inputs through the 74HC595. That
+chip is powered at 5 V and needs about 3.5 V to register a HIGH, which the
+ESP32's 3.3 V does not reliably reach. So we take it out of the path.
+
+The pin mapping below is confirmed against Adafruit's own AFMotor library,
+which this shield clones: shift-register bits 2, 3, 1, 4, 5, 7, 0, 6 drive
+M1A, M1B, M2A, M2B, M3A, M3B, M4A, M4B respectively, and those bits appear on
+QA..QH, which are chip pins 15, 1, 2, 3, 4, 5, 6, 7.
+
+### If the chip is soldered down (most clones, including the photographed one)
+
+Do not try to desolder it. The output-enable pin is active-low and the shield
+holds it high through a pull-up, so with no Arduino plugged in **the outputs
+are already high-impedance**. The chip is physically present but has
+electrically let go of those eight lines, leaving them free to drive.
+
+To make that certain rather than relying on a clone's pull-up, run a wire from
+the `D7` header pad to the shield's `5V` pad. `D7` is the output-enable line.
+Holding it high guarantees the chip stays disconnected.
+
+Then solder your ESP32 wires **onto the 74HC595's own output legs**. Those legs
+are the same electrical nodes as the L293D inputs, so the pin numbers in the
+table below apply unchanged. Use thin stranded wire and keep the iron brief.
+
+> Check with a meter for solder bridges between adjacent legs before powering
+> up. Two shorted direction lines will make a motor buzz and never turn.
+
+### If the chip sits in a socket
+
+Remove it with all power disconnected and store it. Its semicircular notch
+points toward the top motor terminals. Wire into the empty socket contacts,
+or fit a custom plug with the same notch orientation.
 
 Viewed from above with the notch at the top:
 
@@ -42,9 +76,9 @@ Viewed from above with the notch at the top:
      GND             8 o     o  9  unused
 ```
 
-The custom board connects only these socket contacts:
+Connect only these contacts, counting pins on the 74HC595 itself:
 
-| Socket contact | Shield direction line | ESP32 pin | Silkscreen on a 30-pin DevKit |
+| 74HC595 pin | Shield direction line | ESP32 pin | Silkscreen on a 30-pin DevKit |
 | --- | --- | --- | --- |
 | 1 | M2 coil A | GPIO18 | `D18` |
 | 2 | M1 coil A | GPIO16 | `RX2` |
