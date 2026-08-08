@@ -126,10 +126,14 @@ Full detail is in [`hardware/WIRING.md`](hardware/WIRING.md).
 
 ## Phase 3 — Flash the firmware
 
+WiFi and the web UI need the larger partition, so the `PartitionScheme`
+argument is not optional.
+
 ```bash
 arduino-cli core install esp32:esp32          # once
-arduino-cli compile --fqbn esp32:esp32:esp32 .
-arduino-cli upload  --fqbn esp32:esp32:esp32 -p /dev/ttyUSB0 .
+arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app .
+arduino-cli upload  --fqbn esp32:esp32:esp32:PartitionScheme=huge_app \
+    -p /dev/ttyUSB0 .
 ```
 
 If `/dev/ttyUSB0` is missing, check `lsusb` for a CP210x or CH340, and confirm
@@ -228,6 +232,38 @@ python3 sim/simulate.py drawing.gcode --out preview.png
 ```
 
 Check the drawing fits the envelope and that the reported runtime is sane.
+
+---
+
+## Drawing from your phone
+
+The firmware serves its own web page, so there is no app to install and it
+works on Android, iOS, or a laptop equally.
+
+By default the ESP32 hosts a hotspot. Connect your phone to **DVD-Plotter**
+with password `plotter123`, then open **http://192.168.4.1**. Draw with your
+finger and press Plot.
+
+The drawback is that your phone loses its internet connection while joined to
+the plotter. To avoid that, have the ESP32 join your own network instead by
+filling in the credentials near the top of `src/esp32_l293d_plotter.ino`:
+
+```cpp
+const char *WIFI_SSID = "your-network";
+const char *WIFI_PASSWORD = "your-password";
+```
+
+It then prints its address over USB serial at boot; browse to that instead.
+
+The page simplifies each stroke before sending, because a finger drag produces
+hundreds of nearly collinear points and every one would otherwise become a
+separate move for the board to chew through. Stop halts the plot, lifts the
+pen, and releases the motors.
+
+Bluetooth is compiled out by default. Both radios do fit together, but they
+share one antenna and coexistence costs stability, and the drawing UI only
+needs WiFi. Set `ENABLE_BLUETOOTH` to 1 in the firmware if you also want
+serial-terminal control.
 
 ---
 

@@ -1,9 +1,39 @@
 #include <Arduino.h>
-#include <BluetoothSerial.h>
 #include <ctype.h>
 #include <math.h>
 
+// Both radios fit in huge_app together (52% of flash), but Bluetooth Classic
+// and WiFi share one antenna and coexistence costs throughput and stability.
+// The phone drawing UI only needs WiFi, so Bluetooth stays off unless you
+// specifically want to drive the plotter from a serial terminal as well.
+#define ENABLE_WIFI 1
+#define ENABLE_BLUETOOTH 0
+
+#if ENABLE_BLUETOOTH
+#include <BluetoothSerial.h>
 BluetoothSerial SerialBT;
+#endif
+
+#if ENABLE_WIFI
+#include <WiFi.h>
+#include <WebServer.h>
+#include "web_ui.h"
+
+// Leave the SSID empty to host a hotspot instead of joining a network.
+// Joining your own network is nicer: the phone keeps its internet connection.
+const char *WIFI_SSID = "";
+const char *WIFI_PASSWORD = "";
+const char *AP_SSID = "DVD-Plotter";
+const char *AP_PASSWORD = "plotter123";  // must be at least 8 characters
+
+constexpr float BED_SIZE_MM = 35.0f;
+constexpr size_t MAX_JOB_BYTES = 60000;
+
+WebServer server(80);
+String jobBuffer;
+size_t jobCursor = 0;
+bool jobActive = false;
+#endif
 
 // Empty 74HC595 socket directions. Never connect an ESP32 GPIO to socket pin 16.
 constexpr uint8_t X_M1_A = 16;  // Socket pin 2
@@ -108,7 +138,9 @@ String bluetoothLine;
 
 void reply(const String &message) {
   Serial.print(message);
+#if ENABLE_BLUETOOTH
   SerialBT.print(message);
+#endif
 }
 
 void replyLine(const String &message) {
@@ -411,9 +443,105 @@ void consumeInput(Stream &input, String &buffer) {
   }
 }
 
+#if ENABLE_WIFI
+void handleRoot() {
+  String page = FPSTR(WEB_UI);
+  // Substituted here so the page can never disagree with the firmware.
+  page.replace("__BED__", String(BED_SIZE_MM, 1));
+  server.send(200, "text/html", page);
+}
+
+void handlePlot() {
+  if (jobActive) {
+    server.send(409, "text/plain", "already plotting");
+    return;
+  }
+  const String body = server.arg("plain");
+  if (body.isEmpty()) {
+    server.send(400, "text/plain", "empty drawing");
+    return;
+  }
+  if (body.length() > MAX_JOB_BYTES) {
+    server.send(413, "text/plain", "drawing too large");
+    return;
+  }
+  jobBuffer = body;
+  jobCursor = 0;
+  jobActive = true;
+  server.send(200, "text/plain", "plotting");
+}
+
+void handleStatus() {
+  const int percent = (jobActive && jobBuffer.length() > 0)
+                          ? static_cast<int>((100 * jobCursor) / jobBuffer.length())
+                          : 0;
+  String json = "{\"active\":";
+  json += jobActive ? "true" : "false";
+  json += ",\"pct\":" + String(percent);
+  json += ",\"x\":" + String(xPositionMm, 2);
+  json += ",\"y\":" + String(yPositionMm, 2);
+  json += ",\"pen\":";
+  json += penIsDown ? "true" : "false";
+  json += "}";
+  server.send(200, "application/json", json);
+}
+
+void endJob() {
+  jobActive = false;
+  jobBuffer = "";
+  jobCursor = 0;
+  setPen(false);
+  setMotorEnable(false);
+}
+
+void handleStop() {
+  endJob();
+  server.send(200, "text/plain", "stopped");
+}
+
+// One line per loop pass, so the web server stays responsive between moves
+// and Stop actually gets a chance to be heard mid-plot.
+void serviceJob() {
+  if (!jobActive) return;
+  if (jobCursor >= jobBuffer.length()) {
+    endJob();
+    return;
+  }
+  int newline = jobBuffer.indexOf('\n', jobCursor);
+  if (newline < 0) newline = jobBuffer.length();
+  const String line = jobBuffer.substring(jobCursor, newline);
+  jobCursor = newline + 1;
+  executeGcode(line);
+}
+
+void startNetwork() {
+  if (strlen(WIFI_SSID) > 0) {
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    for (int i = 0; i < 40 && WiFi.status() != WL_CONNECTED; ++i) delay(250);
+  }
+  if (WiFi.status() == WL_CONNECTED) {
+    replyLine("WiFi joined " + String(WIFI_SSID));
+    replyLine("Open http://" + WiFi.localIP().toString());
+  } else {
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(AP_SSID, AP_PASSWORD);
+    replyLine("WiFi hotspot \"" + String(AP_SSID) + "\" password " + String(AP_PASSWORD));
+    replyLine("Open http://" + WiFi.softAPIP().toString());
+  }
+  server.on("/", handleRoot);
+  server.on("/plot", HTTP_POST, handlePlot);
+  server.on("/status", handleStatus);
+  server.on("/stop", HTTP_POST, handleStop);
+  server.begin();
+}
+#endif
+
 void setup() {
   Serial.begin(115200);
+#if ENABLE_BLUETOOTH
   SerialBT.begin("DVD_Plotter");
+#endif
 
   pinMode(ENABLE_M1, OUTPUT);
   pinMode(ENABLE_M2, OUTPUT);
@@ -426,11 +554,21 @@ void setup() {
   ledcAttach(SERVO_PIN, SERVO_FREQUENCY_HZ, SERVO_RESOLUTION_BITS);
   setPen(false);
 
+#if ENABLE_WIFI
+  startNetwork();
+#endif
+
   replyLine("ESP32 L293D DVD Plotter ready");
   replyLine("Use $HELP before moving; motors begin disabled.");
 }
 
 void loop() {
   consumeInput(Serial, usbLine);
+#if ENABLE_BLUETOOTH
   consumeInput(SerialBT, bluetoothLine);
+#endif
+#if ENABLE_WIFI
+  server.handleClient();
+  serviceJob();
+#endif
 }
