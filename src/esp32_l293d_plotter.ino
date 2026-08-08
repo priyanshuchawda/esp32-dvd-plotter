@@ -173,6 +173,34 @@ void setPen(bool down) {
   if (changed) delay(penSettleMs);
 }
 
+// Drives one H-bridge output at a time. Its partner is held low, so current
+// flows through just that coil in one direction and the motor gives a single
+// clear twitch. If a twitch is missing, or two outputs move the same coil,
+// the pairs are split across the terminal blocks.
+void coilTest() {
+  struct Output { const char *name; uint8_t pin; };
+  const Output outputs[] = {
+      {"X coil 1, forward", X_M1_A}, {"X coil 1, reverse", X_M1_B},
+      {"X coil 2, forward", X_M2_A}, {"X coil 2, reverse", X_M2_B},
+      {"Y coil 1, forward", Y_M3_A}, {"Y coil 1, reverse", Y_M3_B},
+      {"Y coil 2, forward", Y_M4_A}, {"Y coil 2, reverse", Y_M4_B},
+  };
+
+  replyLine("Coil test: 8 pulses, each 600 ms. Expect one twitch per pulse.");
+  xMotor.release();
+  yMotor.release();
+  setMotorEnable(true);
+  for (const Output &output : outputs) {
+    replyLine(String("  ") + output.name);
+    digitalWrite(output.pin, HIGH);
+    delay(600);
+    digitalWrite(output.pin, LOW);
+    delay(250);
+  }
+  setMotorEnable(false);
+  replyLine("Test finished, motors released.");
+}
+
 void showStatus() {
   String state = "<Idle|MPos:";
   state += String(xPositionMm, 3) + "," + String(yPositionMm, 3);
@@ -258,12 +286,17 @@ bool setSetting(const String &line, const char *prefix, float &setting) {
 
 void handleSystemCommand(const String &line) {
   if (line == "$HELP") {
-    replyLine("$STATUS, $STEPSX=value, $STEPSY=value, $PENUP=us, $PENDOWN=us, "
-              "$PENSETTLE=ms, $PENTHRESH=value, $MOTORS=ON|OFF");
+    replyLine("$STATUS, $COILTEST, $STEPSX=value, $STEPSY=value, $PENUP=us, "
+              "$PENDOWN=us, $PENSETTLE=ms, $PENTHRESH=value, $MOTORS=ON|OFF");
     return;
   }
   if (line == "$STATUS" || line == "?") {
     showStatus();
+    return;
+  }
+  if (line == "$COILTEST") {
+    coilTest();
+    replyLine("ok");
     return;
   }
   if (setSetting(line, "$STEPSX=", stepsPerMmX) || setSetting(line, "$STEPSY=", stepsPerMmY) ||

@@ -155,6 +155,18 @@ Motors start disabled deliberately, so nothing moves until you ask.
 
 Do this with the pen removed or lifted.
 
+**Check the wiring first.** Before commanding any movement:
+
+```
+> $COILTEST
+```
+
+This drives each of the eight H-bridge outputs alone for 600 ms. You should
+feel exactly eight distinct twitches, four per motor. A missing twitch means
+that half-bridge or its wire is dead. Two outputs moving the same coil means a
+pair is split across the two terminal blocks, which is the usual reason a
+motor buzzes without turning.
+
 **Check direction.** Centre both carriages by hand, then:
 
 ```
