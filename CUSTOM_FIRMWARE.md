@@ -1,6 +1,10 @@
 # Custom ESP32 firmware
 
-`esp32-dvd-plotter.ino` is now flashed to the ESP32. It replaces FluidNC for
+> **Deferred.** The machine is running on [`src/uno_plotter`](src/uno_plotter)
+> today. This document describes the ESP32 sketch for later use after the
+> [`hardware/WIRING.md`](hardware/WIRING.md) bypass is built.
+
+`esp32-dvd-plotter.ino` / `src/esp32_l293d_plotter.ino` replaces FluidNC for
 this HW-130 shield; do not upload the old `config.yaml` to this firmware.
 
 The plotter announces itself over:

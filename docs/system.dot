@@ -1,0 +1,15 @@
+digraph system {
+  rankdir=TB;
+  node [shape=box, style=rounded, fontname="Helvetica"];
+  laptop [label="Laptop\nG-code tools + simulator"];
+  uno [label="Arduino Uno\n115200 baud"];
+  shield [label="HW-130 L293D shield\n(AFMotor / 74HC595)"];
+  x [label="X sled\nM1+M2"];
+  y [label="Y sled\nM3+M4"];
+  servo [label="SG90\nSERVO_1 (optional)"];
+  laptop -> uno [label="USB"];
+  uno -> shield;
+  shield -> x;
+  shield -> y;
+  uno -> servo;
+}

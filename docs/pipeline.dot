@@ -1,0 +1,13 @@
+digraph pipeline {
+  rankdir=LR;
+  node [shape=box, style=rounded, fontname="Helvetica"];
+  text [label="text / image /\nhandwriting tools"];
+  gcode [label="G-code"];
+  sim [label="sim/simulate.py\n(--paper)"];
+  send [label="send_gcode.py"];
+  uno [label="Uno + HW-130\nuno_plotter"];
+  sleds [label="X/Y DVD sleds\n55×50 mm bed"];
+  text -> gcode -> sim;
+  sim -> send [label="PNG OK"];
+  send -> uno -> sleds;
+}

@@ -8,7 +8,11 @@ sim/out/
 build/
 __pycache__/
 *.pyc
-cad/out/
+# Keep rendered CAD previews in git; ignore heavy STLs
+cad/out/*.stl
+cad/out/*.echo
+cad/out/*.off
+cad/out/*.amf
 
 # Neural handwriting toolkit and its environment (see tools/setup_handwriting.sh)
 ext/

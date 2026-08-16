@@ -1,7 +1,13 @@
 # Building the ESP32 DVD pen plotter
 
+> **Current working path is the Arduino Uno**, not the ESP32.  
+> Use [`src/uno_plotter`](src/uno_plotter), [`docs/STATUS.md`](docs/STATUS.md),
+> and [`FINDINGS.md`](FINDINGS.md) first. This file remains the ESP32 build
+> narrative for when you migrate (74HC595 bypass, WiFi UI).
+
 This follows the same idea as the popular CD-ROM plotter tutorials, but three
 of their five phases do not work on an ESP32 and are replaced here.
+
 
 | Tutorial step | Why it does not apply | What we do instead |
 | --- | --- | --- |

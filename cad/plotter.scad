@@ -12,7 +12,10 @@ part = "assembly"; // [assembly, pen_lift, paper_bed, gantry_upright]
 sled_length      = 130;  // full length of the salvaged metal chassis
 sled_width       = 42;
 sled_height      = 12;
-sled_travel      = 38;   // usable carriage travel, drives the drawing area
+// Measured on this build: X travel ≈ 55 mm, Y ≈ 50 mm (see FINDINGS.md).
+sled_travel_x    = 55;
+sled_travel_y    = 50;
+sled_travel      = sled_travel_x;  // legacy alias used by older layout code
 carriage_length  = 30;
 carriage_width   = 26;
 
@@ -23,9 +26,9 @@ base_thickness   = 6;
 upright_thickness = 6;
 upright_width    = 26;
 
-/* [Paper bed] */
-bed_x            = 70;
-bed_y            = 70;
+/* [Paper bed] — matches measured usable area */
+bed_x            = 55;
+bed_y            = 50;
 bed_thickness     = 3;
 
 /* [SG90 servo] */
