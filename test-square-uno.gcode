@@ -1,4 +1,4 @@
-; 10 mm square for Uno + HW-130 (bed ~55 x 70 mm).
+; 10 mm square for Uno + HW-130 (bed ~55 x 50 mm).
 ; Centre sleds near origin before starting. Pen lifted / removed for first run.
 G21
 G90

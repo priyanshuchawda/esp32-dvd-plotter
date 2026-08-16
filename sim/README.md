@@ -8,12 +8,21 @@ the real ESP32 running the actual compiled binary.
 `firmware_model.py` is a line-by-line port of the motion logic in
 [`../src/esp32_l293d_plotter.ino`](../src/esp32_l293d_plotter.ino): the same
 Bresenham interleave, the same `lroundf` step rounding, the same four-phase
-coil table. Simulating a job therefore reproduces what the firmware will really
-do, including step quantisation.
+coil table. The Uno plotter uses the same G-code dialect and Bresenham idea, so
+the same preview works for Uno jobs if you pass the calibrated steps/mm.
+
+**Uno defaults (measured):** bed 55×50 mm, **2.058** steps/mm on X and Y.
 
 ```bash
-python3 sim/simulate.py test-square.gcode
-python3 sim/simulate.py myart.gcode --envelope 35 --steps-x 7.21 --steps-y 6.98
+# Uno square (current hardware)
+python3 sim/simulate.py test-square-uno.gcode \
+  --envelope 55 --steps-x 2.058 --steps-y 2.058 \
+  --out sim/out/uno_square.png
+
+# Any job — always match firmware $STEPSX/$STEPSY and bed
+python3 sim/simulate.py myart.gcode \
+  --envelope 55 --steps-x 2.058 --steps-y 2.058 \
+  --out sim/out/preview.png
 ```
 
 It writes a PNG to `sim/out/` showing the drawn path, the pen-up travel moves,
@@ -32,7 +41,7 @@ model must change too, or the simulation stops being meaningful.
 
 This runs the actual compiled binary on an emulated ESP32 and captures the real
 GPIO transitions, so it validates the shipped firmware rather than a model of
-it.
+it. Relevant once you leave the Uno path.
 
 Install once:
 

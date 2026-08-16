@@ -1,87 +1,71 @@
-# ESP32 DVD Pen Plotter
+# ESP32 / Uno DVD Pen Plotter
 
-This project controls two DVD-drive bipolar steppers through the existing
-HW-130 L293D motor shield and an ESP32. The shield is not an A4988 board, so
-it uses custom coil-sequencing firmware instead of FluidNC.
+DVD-drive sleds on an **HW-130 L293D** shield. The active path is **Arduino Uno
++ AFMotor**. ESP32 custom firmware is in the tree for later (the shield’s
+74HC595 is 5 V and needs a bypass for 3.3 V logic).
 
 ## Current state
 
-**Working path right now: Arduino Uno + HW-130** (motors proven). ESP32 wiring
-is deferred until the Uno plotter draws cleanly.
+See [`FINDINGS.md`](FINDINGS.md) for measured bed size, coil ohms, speed tests,
+and the steps/mm calibration trail.
 
-- Bring-up sketch: [`src/uno_motor_test`](src/uno_motor_test)
-- Plotter firmware: [`src/uno_plotter`](src/uno_plotter) — G-code over USB at
-  115200 baud, AFMotor + optional SG90 on `SERVO_1` (pin 10)
-- Bed from this frame: about **55 mm × 70 mm**
-- ESP32 firmware remains in [`src/esp32_l293d_plotter.ino`](src/esp32_l293d_plotter.ino)
-  for later
+- **Firmware (use this):** [`src/uno_plotter`](src/uno_plotter) @ 115200 baud  
+- **Bring-up jog:** [`src/uno_motor_test`](src/uno_motor_test) @ 9600 baud  
+- **Bed:** 55 × 50 mm · **steps/mm:** 2.058 on both axes (ruler-verified)  
+- **ESP32 sketch:** [`src/esp32_l293d_plotter.ino`](src/esp32_l293d_plotter.ino) (deferred)
 
-## Uno build order
+## Uno quick start
 
-1. Keep the shield on the Uno (yellow `PWR` jumper on for USB-only first tests).
-2. Flash `src/uno_plotter`, centre both sleds by hand.
-3. Calibrate: send `$CALX=10`, measure real travel D mm, then
-   `$STEPSX=` = `(10/D) * current_steps`. Same for Y with `$CALY=`.
-4. Dry-run [`test-square-uno.gcode`](test-square-uno.gcode) with pen removed,
-   then plot with `tools/send_gcode.py -p /dev/ttyACM0 -b 115200 ...`.
-5. Plug SG90 into shield `SERVO_1` (orange signal toward pin 10), tune
-   `$PENUP=` / `$PENDOWN=` degrees.
+1. Shield on Uno, motors on M1/M2 (X) and M3/M4 (Y), yellow `PWR` on for USB tests.
+2. Park sleds at the **paper corner** (software origin), then:
+
+```bash
+arduino-cli compile -b arduino:avr:uno src/uno_plotter
+arduino-cli upload  -b arduino:avr:uno -p /dev/ttyACM0 src/uno_plotter
+```
+
+3. Preview, then plot:
+
+```bash
+python3 sim/simulate.py test-square-uno.gcode \
+  --envelope 55 --steps-x 2.058 --steps-y 2.058 -o sim/out/square.png
+
+tools/send_gcode.py -p /dev/ttyACM0 -b 115200 test-square-uno.gcode
+```
+
+4. Optional SG90 on shield **SERVO_1** (pin 10): tune `$PENUP=` / `$PENDOWN=`.
 
 ## Making G-code
 
-| Tool | Use it for |
+| Tool | Use |
 | --- | --- |
-| [`tools/text2gcode.py`](tools/text2gcode.py) | Writing text with single-stroke Hershey fonts |
-| [`tools/image2gcode.py`](tools/image2gcode.py) | Tracing a bitmap into outlines |
-| [`tools/handwriting2gcode.py`](tools/handwriting2gcode.py) | Generating handwriting with a neural model |
-| [`tools/send_gcode.py`](tools/send_gcode.py) | Streaming a job over USB serial |
-
-Use `text2gcode.py` for text rather than tracing a rendered font. Tracing
-follows the *outline* of each letter, so the pen draws each stroke as a hollow
-loop, which is unreadable at the size this machine works at. Hershey fonts
-store stroke centrelines, so the pen follows the same path a hand would.
+| [`tools/text2gcode.py`](tools/text2gcode.py) | Single-stroke Hershey text |
+| [`tools/handwriting2gcode.py`](tools/handwriting2gcode.py) | Neural handwriting (CPU) |
+| [`tools/image2gcode.py`](tools/image2gcode.py) | Bitmap → outlines |
+| [`tools/send_gcode.py`](tools/send_gcode.py) | USB stream to plotter |
 
 ```bash
-tools/text2gcode.py "hello world" -o hello.gcode
-tools/text2gcode.py --font cursive --char-height 3 "your text" -o note.gcode
-python3 sim/simulate.py note.gcode --envelope 35 --out preview.png
+tools/text2gcode.py --width 55 --height 50 --char-height 8 "hi" -o hi.gcode
+python3 sim/simulate.py hi.gcode --envelope 55 --steps-x 2.058 --steps-y 2.058 -o sim/out/hi.png
 ```
 
-`futural` is a plain sans face and `cursive` is joined handwriting; `timesr`,
-`futuram`, and `gothiceng` are also included. Default characters are 4 mm tall,
-which fits roughly 7 per line. Dropping to 3 mm fits about 11 characters across
-4 lines, which is close to the practical limit of a 35 mm bed.
+Prefer Hershey / online strokes over tracing a normal TTF (outlines look hollow
+at this scale). Step size is ~0.5 mm, so keep letters large.
 
-## Neural handwriting
+## Simulation vs CAD
 
-Hershey `cursive` is joined but mechanical — every `o` is identical. For output
-with real variation, a Graves-style LSTM predicts pen trajectories directly, so
-there is no image or vectorisation step between the model and the G-code.
+| Tool | What it’s for |
+| --- | --- |
+| `sim/simulate.py` | Toolpath / pen / envelope check before paper |
+| `sim/spice/` | Coil current vs step rate (ngspice) |
+| `cad/plotter.scad` | Frame / bracket geometry (OpenSCAD CLI) |
+| Blender | Mesh / visuals if needed — not for G-code |
 
-```bash
-./tools/setup_handwriting.sh          # clones the model, builds ext/venv
-ext/venv/bin/python tools/handwriting2gcode.py "hello world" -o hw.gcode --seed 7
-python3 sim/simulate.py hw.gcode --envelope 35 --out preview.png
-```
+## ESP32 (later)
 
-Sampling runs on the CPU in about ten seconds a line; no GPU is needed. `--bias`
-trades variation for legibility, and higher is usually right at this size.
-`--seed` fixes the style so a result can be reproduced. `--wrap` sets characters
-per line, which is what actually controls how large the writing ends up.
+When leaving the Uno path: remove the yellow `PWR` jumper, tie shield `D7` to
+`5V` to tri-state the 74HC595, and follow [`hardware/WIRING.md`](hardware/WIRING.md).
+That change breaks AFMotor until the wire is removed again.
 
-The model is not perfectly accurate — it occasionally malforms a letter, so
-check the preview before plotting. Verifying output with a handwriting
-recogniser would catch this automatically and is the obvious next addition.
-
-Everything lands in `ext/`, which is gitignored; delete it to start over.
-
-## Size limits
-
-DVD sleds give about 35 mm of travel per axis, so the whole page is smaller
-than a postage stamp — around 40 characters of 3 mm cursive. Nothing in
-software changes that. Writing longer passages needs either a paper-feed axis
-or a machine with longer rails.
-
-`config.yaml` and `upload-fluidnc-file.py` are retained only as history from
-the earlier A4988/FluidNC approach. They must not be used with this L293D
-shield.
+`config.yaml` / FluidNC files are historical only — do not use them with this
+L293D shield.
