@@ -6,23 +6,26 @@ it uses custom coil-sequencing firmware instead of FluidNC.
 
 ## Current state
 
-- Custom USB/Bluetooth firmware is compiled, flashed, and responds on
-  `/dev/ttyUSB0`.
-- The ESP32 reports `ESP32 L293D DVD Plotter ready`.
-- Motors are disabled by default.
-- The physical socket-plug PCB, power wiring, motor-coil identification, and
-  calibration remain to be performed with the hardware.
+**Working path right now: Arduino Uno + HW-130** (motors proven). ESP32 wiring
+is deferred until the Uno plotter draws cleanly.
 
-## Build order
+- Bring-up sketch: [`src/uno_motor_test`](src/uno_motor_test)
+- Plotter firmware: [`src/uno_plotter`](src/uno_plotter) — G-code over USB at
+  115200 baud, AFMotor + optional SG90 on `SERVO_1` (pin 10)
+- Bed from this frame: about **55 mm × 70 mm**
+- ESP32 firmware remains in [`src/esp32_l293d_plotter.ino`](src/esp32_l293d_plotter.ino)
+  for later
 
-1. Build and continuity-check the custom socket plug using
-   [`hardware/WIRING.md`](hardware/WIRING.md).
-2. Connect the 5 V, 3 A supply and identify the two coil pairs on each DVD
-   motor. Do not apply motor power until the continuity checks pass.
-3. Follow [`CUSTOM_FIRMWARE.md`](CUSTOM_FIRMWARE.md) to test one axis at a
-   time, set safe servo endpoints, and calibrate steps/mm.
-4. Run [`test-square.gcode`](test-square.gcode) with the pen lifted, then on
-   paper.
+## Uno build order
+
+1. Keep the shield on the Uno (yellow `PWR` jumper on for USB-only first tests).
+2. Flash `src/uno_plotter`, centre both sleds by hand.
+3. Calibrate: send `$CALX=10`, measure real travel D mm, then
+   `$STEPSX=` = `(10/D) * current_steps`. Same for Y with `$CALY=`.
+4. Dry-run [`test-square-uno.gcode`](test-square-uno.gcode) with pen removed,
+   then plot with `tools/send_gcode.py -p /dev/ttyACM0 -b 115200 ...`.
+5. Plug SG90 into shield `SERVO_1` (orange signal toward pin 10), tune
+   `$PENUP=` / `$PENDOWN=` degrees.
 
 ## Making G-code
 
