@@ -24,10 +24,10 @@ const uint8_t SERVO_PIN = 10;  // shield SERVO_1 header
 
 // Physical bed from your frame: ~55 mm X, ~70 mm Y. Tune steps/mm with
 // $STEPSX= / $STEPSY= after a measured move.
-float stepsPerMmX = 6.667f;
-float stepsPerMmY = 6.667f;
+float stepsPerMmX = 3.704f;
+float stepsPerMmY = 3.704f;
 float bedMaxX = 55.0f;
-float bedMaxY = 70.0f;
+float bedMaxY = 50.0f;
 
 float xMm = 0.0f;
 float yMm = 0.0f;
