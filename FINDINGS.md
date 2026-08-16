@@ -67,6 +67,10 @@ Formula if you recalibrate:
 
 ## Simulation (no hardware)
 
+Until pen and paper exist, treat `sim/simulate.py --paper` as the stand-in for a finished page. Defaults are already the measured 55×50 mm bed and 2.058 steps/mm.
+
+## Simulation commands
+
 Always pass the calibrated bed and steps:
 
 ```bash

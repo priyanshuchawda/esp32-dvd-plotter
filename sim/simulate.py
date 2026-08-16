@@ -2,8 +2,9 @@
 """Simulate a G-code job against the plotter firmware model and render the result.
 
 Usage:
-  python3 sim/simulate.py test-square.gcode
-  python3 sim/simulate.py test-square.gcode --envelope 35 --out sim/out/square.png
+  python3 sim/simulate.py test-square-uno.gcode
+  python3 sim/simulate.py hi.gcode --width 55 --height 50 --steps-x 2.058 --steps-y 2.058
+  python3 sim/simulate.py hi.gcode --paper   # ink-only page preview (no coils)
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.patches import Rectangle  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -26,6 +28,11 @@ SIGNAL_LABELS = (
     "X M1A", "X M1B", "X M2A", "X M2B",
     "Y M3A", "Y M3B", "Y M4A", "Y M4B",
 )
+
+# Defaults match the measured Uno + HW-130 frame (see FINDINGS.md).
+DEFAULT_WIDTH = 55.0
+DEFAULT_HEIGHT = 50.0
+DEFAULT_STEPS = 2.058
 
 
 def build_segments(model: PlotterModel):
@@ -53,40 +60,68 @@ def build_segments(model: PlotterModel):
     return segments
 
 
-def render(model: PlotterModel, segments, envelope_mm: float, output: Path, title: str) -> None:
-    figure = plt.figure(figsize=(13, 6))
-    path_axes = figure.add_subplot(1, 2, 1)
-    coil_axes = figure.add_subplot(1, 2, 2)
-
-    for pen_down, points in segments:
-        xs = [point[0] for point in points]
-        ys = [point[1] for point in points]
-        if pen_down:
-            path_axes.plot(xs, ys, linewidth=2.0, color="#1f4fd8", zorder=3)
-        else:
-            path_axes.plot(xs, ys, linewidth=1.0, color="#c23b22",
-                           linestyle="--", alpha=0.75, zorder=2)
-
-    path_axes.add_patch(
-        plt.Rectangle((0, 0), envelope_mm, envelope_mm, fill=False,
+def _draw_paths(path_axes, segments, width_mm: float, height_mm: float,
+                paper: bool) -> None:
+    if paper:
+        path_axes.set_facecolor("#f4f1ea")
+        path_axes.add_patch(
+            Rectangle((0, 0), width_mm, height_mm, fill=True,
+                      facecolor="#fffdf8", edgecolor="#333333", linewidth=1.2)
+        )
+        for pen_down, points in segments:
+            if not pen_down:
+                continue
+            xs = [p[0] for p in points]
+            ys = [p[1] for p in points]
+            path_axes.plot(xs, ys, linewidth=1.8, color="#1a1a1a",
+                           solid_capstyle="round", solid_joinstyle="round", zorder=3)
+        path_axes.set_title("Paper preview (ink only)")
+    else:
+        for pen_down, points in segments:
+            xs = [p[0] for p in points]
+            ys = [p[1] for p in points]
+            if pen_down:
+                path_axes.plot(xs, ys, linewidth=2.0, color="#1f4fd8", zorder=3)
+            else:
+                path_axes.plot(xs, ys, linewidth=1.0, color="#c23b22",
+                               linestyle="--", alpha=0.75, zorder=2)
+        path_axes.add_patch(
+            Rectangle((0, 0), width_mm, height_mm, fill=False,
                       edgecolor="#888888", linestyle=":", linewidth=1.2)
-    )
-    path_axes.plot([], [], color="#1f4fd8", linewidth=2.0, label="pen down (drawn)")
-    path_axes.plot([], [], color="#c23b22", linestyle="--", label="pen up (travel)")
-    path_axes.plot([], [], color="#888888", linestyle=":", label=f"{envelope_mm:g} mm envelope")
+        )
+        path_axes.plot([], [], color="#1f4fd8", linewidth=2.0, label="pen down (drawn)")
+        path_axes.plot([], [], color="#c23b22", linestyle="--", label="pen up (travel)")
+        path_axes.plot([], [], color="#888888", linestyle=":",
+                       label=f"bed {width_mm:g}×{height_mm:g} mm")
+        path_axes.legend(loc="upper right", fontsize=8)
+        path_axes.set_title("Toolpath")
 
-    path_axes.set_aspect("equal", adjustable="datalim")
-    path_axes.grid(True, alpha=0.3)
+    path_axes.set_aspect("equal", adjustable="box")
+    path_axes.set_xlim(-2, width_mm + 2)
+    path_axes.set_ylim(-2, height_mm + 2)
+    path_axes.grid(True, alpha=0.25)
     path_axes.set_xlabel("X (mm)")
     path_axes.set_ylabel("Y (mm)")
-    path_axes.set_title(f"Toolpath: {title}")
-    path_axes.legend(loc="upper right", fontsize=8)
 
-    _render_coils(model, coil_axes)
+
+def render(model: PlotterModel, segments, width_mm: float, height_mm: float,
+           output: Path, title: str, paper: bool) -> None:
+    if paper:
+        figure = plt.figure(figsize=(6.5, 6.0))
+        path_axes = figure.add_subplot(1, 1, 1)
+        _draw_paths(path_axes, segments, width_mm, height_mm, paper=True)
+        path_axes.set_title(f"{title} — paper preview")
+    else:
+        figure = plt.figure(figsize=(13, 6))
+        path_axes = figure.add_subplot(1, 2, 1)
+        coil_axes = figure.add_subplot(1, 2, 2)
+        _draw_paths(path_axes, segments, width_mm, height_mm, paper=False)
+        path_axes.set_title(f"Toolpath: {title}")
+        _render_coils(model, coil_axes)
 
     figure.tight_layout()
     output.parent.mkdir(parents=True, exist_ok=True)
-    figure.savefig(output, dpi=110)
+    figure.savefig(output, dpi=120)
     plt.close(figure)
 
 
@@ -114,14 +149,26 @@ def _render_coils(model: PlotterModel, axes, max_events: int = 40) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("gcode", type=Path)
-    parser.add_argument("--envelope", type=float, default=35.0,
-                        help="assumed usable travel per axis in mm")
-    parser.add_argument("--steps-x", type=float, default=6.667)
-    parser.add_argument("--steps-y", type=float, default=6.667)
+    parser.add_argument("--width", type=float, default=DEFAULT_WIDTH,
+                        help=f"bed width in mm (default {DEFAULT_WIDTH:g})")
+    parser.add_argument("--height", type=float, default=DEFAULT_HEIGHT,
+                        help=f"bed height in mm (default {DEFAULT_HEIGHT:g})")
+    parser.add_argument("--envelope", type=float, default=None,
+                        help="legacy: square bed size; sets both width and height")
+    parser.add_argument("--steps-x", type=float, default=DEFAULT_STEPS)
+    parser.add_argument("--steps-y", type=float, default=DEFAULT_STEPS)
+    parser.add_argument("--paper", action="store_true",
+                        help="ink-only page preview (closest stand-in for no pen/paper)")
     parser.add_argument("--out", type=Path, default=None)
     arguments = parser.parse_args()
+
+    width = arguments.width
+    height = arguments.height
+    if arguments.envelope is not None:
+        width = height = arguments.envelope
 
     gcode = arguments.gcode.read_text()
     model = PlotterModel(
@@ -130,8 +177,9 @@ def main() -> int:
     ).run(gcode)
 
     segments = build_segments(model)
-    output = arguments.out or Path("sim/out") / f"{arguments.gcode.stem}.png"
-    render(model, segments, arguments.envelope, output, arguments.gcode.name)
+    suffix = "_paper" if arguments.paper else ""
+    output = arguments.out or Path("sim/out") / f"{arguments.gcode.stem}{suffix}.png"
+    render(model, segments, width, height, output, arguments.gcode.name, arguments.paper)
 
     drawn = [points for pen_down, points in segments if pen_down]
     all_points = [point for _, points in segments for point in points]
@@ -146,6 +194,7 @@ def main() -> int:
     )
 
     print(f"job              : {arguments.gcode}")
+    print(f"bed              : {width:g} x {height:g} mm")
     print(f"resolution       : {1 / model.steps_per_mm_x:.3f} mm per X step, "
           f"{1 / model.steps_per_mm_y:.3f} mm per Y step")
     print(f"step events      : {len(model.events)} ({x_steps} X, {y_steps} Y)")
@@ -160,15 +209,13 @@ def main() -> int:
     print(f"render           : {output}")
 
     warnings = list(model.errors)
-    if xs and (min(xs) < -1e-6 or max(xs) > arguments.envelope):
+    if xs and (min(xs) < -1e-6 or max(xs) > width + 1e-6):
         warnings.append(
-            f"X travel {min(xs):.2f}..{max(xs):.2f} mm leaves the "
-            f"0..{arguments.envelope:g} mm envelope"
+            f"X travel {min(xs):.2f}..{max(xs):.2f} mm leaves the 0..{width:g} mm bed"
         )
-    if ys and (min(ys) < -1e-6 or max(ys) > arguments.envelope):
+    if ys and (min(ys) < -1e-6 or max(ys) > height + 1e-6):
         warnings.append(
-            f"Y travel {min(ys):.2f}..{max(ys):.2f} mm leaves the "
-            f"0..{arguments.envelope:g} mm envelope"
+            f"Y travel {min(ys):.2f}..{max(ys):.2f} mm leaves the 0..{height:g} mm bed"
         )
     if model.pen_down:
         warnings.append("job ended with the pen still down")
