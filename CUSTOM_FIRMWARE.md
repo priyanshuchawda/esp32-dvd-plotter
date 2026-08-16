@@ -1,88 +1,41 @@
 # Custom ESP32 firmware
 
-> **Deferred.** The machine is running on [`src/uno_plotter`](src/uno_plotter)
-> today. This document describes the ESP32 sketch for later use after the
-> [`hardware/WIRING.md`](hardware/WIRING.md) bypass is built.
+> **Active sketch:** [`src/esp32/esp32_plotter`](src/esp32/esp32_plotter/) —
+> drives the HW-130 **74HC595 with jumper wires** (no soldering).  
+> Uno stays in [`src/uno/`](src/uno/). Wiring: [`hardware/WIRING.md`](hardware/WIRING.md).
 
-`esp32-dvd-plotter.ino` / `src/esp32_l293d_plotter.ino` replaces FluidNC for
-this HW-130 shield; do not upload the old `config.yaml` to this firmware.
-
-The plotter announces itself over:
+The sketch announces itself over:
 
 - USB serial at `115200` baud;
-- Bluetooth Classic Serial as `DVD_Plotter`.
+- Wi-Fi AP `DVD-Plotter` / `plotter123` (drawing UI);
+- optional Bluetooth Classic as `DVD_Plotter` (`ENABLE_BLUETOOTH 1`).
 
-It begins with motor outputs disabled. Connect via USB first and send:
+Motors start disabled. First commands:
 
 ```text
 $HELP
 $STATUS
+$COILTEST
+$POWER=70
 ```
 
-The expected reply includes:
+Then stream G-code with `tools/send_gcode.py` or the phone UI.
 
-```text
-<Idle|MPos:0.000,0.000|Pen:Up|Motors:Off>
-```
+## Settings
 
-## Supported commands
-
-| Command | Effect |
+| Command | Meaning |
 | --- | --- |
-| `G21`, `G20` | use millimetres or inches |
-| `G90`, `G91` | absolute or relative coordinates |
-| `G92 X0 Y0` | declare the current carriage location as a coordinate |
-| `G0 X... Y...` | rapid move |
-| `G1 X... Y... F...` | linear drawing move |
-| `G0 Z5` | pen up |
-| `G1 Z0` | pen down |
-| `M3` / `M4` | pen down |
-| `M5` | pen up |
-| `M2` / `M30` | pen up and disable motors |
-| `$STEPSX=value` | set X full-steps per millimetre |
-| `$STEPSY=value` | set Y full-steps per millimetre |
-| `$PENUP=value` | set pen-up pulse, 500–2500 microseconds |
-| `$PENDOWN=value` | set pen-down pulse, 500–2500 microseconds |
-| `$MOTORS=ON` / `$MOTORS=OFF` | explicitly energize/release coils |
-| `$STATUS` | show current position and state |
+| `$STEPSX=` / `$STEPSY=` | steps per mm (default 2.058 from Uno cal) |
+| `$POWER=` | PWM duty on L293D enables (5–100) |
+| `$INVERTX=` / `$INVERTY=` | flip axis direction |
+| `$PENUP=` / `$PENDOWN=` | servo pulse µs |
+| `$MOTORS=ON\|OFF` | enable / release |
 
-Only `G0` and `G1` motion is currently implemented. Convert vector artwork
-to line segments; do not send arc commands (`G2`/`G3`), homing commands, or
-FluidNC/GRBL `$` settings.
+## Flash
 
-## Commissioning commands
-
-After the hardware continuity checks in
-[`hardware/WIRING.md`](hardware/WIRING.md) pass, run these one line at a time:
-
-```text
-$MOTORS=ON
-G92 X0 Y0
-G91
-G1 X1 F60
-G1 Y1 F60
-G90
-$MOTORS=OFF
+```bash
+arduino-cli compile -b esp32:esp32:esp32 src/esp32/esp32_plotter
+arduino-cli upload  -b esp32:esp32:esp32 -p /dev/ttyUSB0 src/esp32/esp32_plotter
 ```
 
-With the pen removed, measure a 20 mm move on each axis. Calculate and set:
-
-```text
-new_steps_per_mm = old_steps_per_mm × commanded_mm / measured_mm
-```
-
-The initial `6.667` value is only a typical DVD-drive estimate. For example,
-if a commanded 20 mm X move measures 18.5 mm:
-
-```text
-$STEPSX=7.207
-```
-
-The settings are not yet persistent across an ESP32 reset. After final
-calibration, update the four defaults near the top of
-`src/esp32_l293d_plotter.ino`, compile, and flash again.
-
-## Draw test
-
-Run `test-square.gcode` with the pen lifted first. It includes only supported
-linear moves and ends with `M2`, which releases the L293D outputs.
+Archived solder-bypass firmware: [`src/esp32/legacy_bypass/`](src/esp32/legacy_bypass/).

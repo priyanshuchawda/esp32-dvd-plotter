@@ -38,7 +38,7 @@ with a ruler:
 | 10 mm | 12 mm | 2.058 |
 | 10 mm | **10 mm** | **2.058** (kept) |
 
-Firmware defaults in `src/uno_plotter` are therefore:
+Firmware defaults in `src/uno/uno_plotter` are therefore:
 
 ```text
 $STEPSX=2.058
@@ -56,10 +56,11 @@ Formula if you recalibrate:
 
 | Piece | Role |
 | --- | --- |
-| `src/uno_motor_test` | Manual `x`/`y` jog for wiring bring-up |
-| `src/uno_plotter` | G-code plotter @ **115200** baud (M300, G0/G1, `$…`) |
+| `src/uno/uno_motor_test` | Manual `x`/`y` jog for wiring bring-up |
+| `src/uno/uno_plotter` | Uno G-code plotter @ **115200** |
+| `src/esp32/esp32_plotter` | ESP32 G-code + WiFi UI (74HC595 jumpers) |
 | `tools/uno_console.py` | Multi-command jog helper for the motor-test sketch |
-| `tools/send_gcode.py` | Stream jobs: `-p /dev/ttyACM0 -b 115200` |
+| `tools/send_gcode.py` | Stream jobs over USB |
 | `tools/text2gcode.py` | Hershey single-stroke text → G-code |
 | `tools/handwriting2gcode.py` | Neural strokes → G-code (`setup_handwriting.sh` first) |
 | `tools/image2gcode.py` | Bitmap → outlines → G-code |
@@ -82,8 +83,8 @@ python3 sim/simulate.py test-square-uno.gcode \
 OpenSCAD (`cad/plotter.scad`) and Blender are for **mechanical design**, not
 for checking whether a plot looks right. Use `sim/simulate.py` for that.
 
-## ESP32 (later)
+## ESP32
 
-Do not solder the `D7`→`5V` 74HC595 disable while finishing Uno plots — that
-disables the stock AFMotor path. When ready: `hardware/WIRING.md` and
-`src/esp32_l293d_plotter.ino`.
+Jumper path (no soldering): [`hardware/WIRING.md`](hardware/WIRING.md) and
+[`src/esp32/esp32_plotter`](src/esp32/esp32_plotter/). Uno folder stays usable —
+unplug jumpers and restack the shield.

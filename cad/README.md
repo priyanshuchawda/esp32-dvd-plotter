@@ -1,7 +1,7 @@
 # Mechanical CAD
 
-[`plotter.scad`](plotter.scad) is a parametric model of the whole machine,
-driven from the terminal with OpenSCAD.
+[`plotter.scad`](plotter.scad) is a parametric model of the whole machine.
+[`pcb/`](pcb/) is the **ESP32 ↔ HW-130 adapter** KiCad project (Uno-form stack).
 
 Bed defaults match this build’s measurements (**55 × 50 mm**). Other sled
 dimensions are still estimates — measure your chassis before cutting or

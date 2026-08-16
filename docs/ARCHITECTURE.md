@@ -63,8 +63,8 @@ Origin is a **corner**, not the middle of the rails.
 | Sketch | Baud | Use |
 | --- | --- | --- |
 | `src/uno_motor_test` | 9600 | Manual jog / wiring bring-up |
-| `src/uno_plotter` | 115200 | Real plots (G0/G1/M300/…) |
-| `src/esp32_l293d_plotter.ino` | 115200 + WiFi | Later — needs 74HC595 bypass |
+| `src/uno/uno_plotter` | 115200 | Uno + stacked HW-130 |
+| `src/esp32/esp32_plotter` | 115200 + WiFi | ESP32 jumpers → 74HC595 (no solder) |
 
 ## Deferred ESP32 path
 

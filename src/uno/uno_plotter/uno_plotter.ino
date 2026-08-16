@@ -4,8 +4,8 @@
 // place). Compatible with tools/send_gcode.py, tools/text2gcode.py, and
 // tools/handwriting2gcode.py (M300 pen commands).
 //
-//   arduino-cli compile -b arduino:avr:uno src/uno_plotter
-//   arduino-cli upload  -b arduino:avr:uno -p /dev/ttyACM0 src/uno_plotter
+//   arduino-cli compile -b arduino:avr:uno src/uno/uno_plotter
+//   arduino-cli upload  -b arduino:avr:uno -p /dev/ttyACM0 src/uno/uno_plotter
 //   tools/send_gcode.py -p /dev/ttyACM0 -b 115200 test-square-uno.gcode
 //
 // Centre both sleds by hand before power-on (no endstops).
